@@ -1,0 +1,262 @@
+# Circlecells
+# by Ben Crowder
+
+import math
+import random
+
+size(1000, 1000)
+background("f7f4ef")
+
+PAGE_SIZE = 1000
+MARGIN = 50
+GRID_SIZE = 20
+GRID_SIZE_MIN_1 = GRID_SIZE - 1
+CELL_SIZE = math.floor((PAGE_SIZE - (MARGIN * 2)) / GRID_SIZE)
+HALF_CELL_SIZE = CELL_SIZE / 2
+BOX_SIZE = GRID_SIZE * CELL_SIZE
+
+BASE_CIRCLE_SIZE = 2
+
+def get_initial_value(x, y):
+    """ Function to specify values for initial grid. """
+    val = random.randint(0, 5)
+
+    # If value is 0 or 1, cell is alive; otherwise dead
+    if val <= 1:
+        return 1
+
+    return 0
+
+def setup_grid(seed=-1):
+    """ Set up the initial grid. """
+
+    # Set seed if specified
+    if seed != -1:
+        random.seed(seed)
+
+    cellgrid = []
+
+    # Initialize the grid
+    for x in range(0, GRID_SIZE):
+        row = []
+
+        for y in range(0, GRID_SIZE):
+            row.append(get_initial_value(x, y))
+
+        cellgrid.append(row)
+
+    return cellgrid
+
+def get_neighbors(g, x, y):
+    """ Returns 1/2/3/4/6/7/8/9 depending on which neighbors are alive. """
+
+    response = []
+
+    # Above
+    if y > 0:
+        if g[x][y - 1]:
+            response.append(8)
+        if x > 0:
+            if g[x - 1][y - 1]:
+                response.append(7)
+        if x < GRID_SIZE_MIN_1:
+            if g[x + 1][y - 1]:
+                response.append(9)
+
+    # Below
+    if y < GRID_SIZE_MIN_1:
+        if g[x][y + 1]:
+            response.append(2)
+        if x > 0:
+            if g[x - 1][y + 1]:
+                response.append(1)
+        if x < GRID_SIZE_MIN_1:
+            if g[x + 1][y + 1]:
+                response.append(3)
+
+    # Left
+    if x > 0:
+        if g[x - 1][y]:
+            response.append(4)
+
+    # Right
+    if x < GRID_SIZE_MIN_1:
+        if g[x + 1][y]:
+            response.append(6)
+
+    return response
+
+def draw_grid(cellgrid, i, j, true_fill=(0, 0, 0), pen_width=0.5):
+    """ Draws the grid. """
+
+    push()
+    translate(i, j)
+
+    stroke(0)
+    pen(pen_width)
+
+    for x in range(0, GRID_SIZE):
+        for y in range(0, GRID_SIZE):
+            value = cellgrid[x][y]
+
+            if value:
+                fill(HSV, *true_fill)
+            else:
+                fill(None)
+
+            rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+
+    pop()
+
+def draw_lines(cellgrid, i, j, pen_stroke, pen_width):
+    """ Draws lines from the center of each living cell to any living neighbor cells. """
+
+    push()
+    translate(i, j)
+
+    stroke(pen_stroke)
+    pen(pen_width)
+
+    # Store this for quicker calculations later
+    neighbor_lines = {
+        # Lower left
+        1: (-CELL_SIZE, +CELL_SIZE),
+        # Lower middle
+        2: (0, +CELL_SIZE),
+        # Lower right
+        3: (+CELL_SIZE, +CELL_SIZE),
+        # Left
+        4: (-CELL_SIZE, 0),
+        # Right
+        6: (+CELL_SIZE, 0),
+        # Upper left
+        7: (-CELL_SIZE, -CELL_SIZE),
+        # Upper middle
+        8: (0, -CELL_SIZE),
+        # Upper right
+        9: (+CELL_SIZE, -CELL_SIZE),
+    }
+
+    # Go through the grid
+    for x in range(0, GRID_SIZE):
+        for y in range(0, GRID_SIZE):
+            value = cellgrid[x][y]
+
+            if value:
+                # Get list of living neighbor cells
+                neighbors = get_neighbors(g, x, y)
+
+                # Center the origin of the line
+                cur_x = (x * CELL_SIZE) + HALF_CELL_SIZE
+                cur_y = (y * CELL_SIZE) + HALF_CELL_SIZE
+
+                # Draw lines to neighbors
+                for neighbor in neighbors:
+                    line(cur_x, cur_y, cur_x + neighbor_lines[neighbor][0], cur_y + neighbor_lines[neighbor][1])
+
+    pop()
+
+def draw_circles(cellgrid, i, j, circle_fill):
+    """ Draws circles (size dependent on number of living neighbors). """
+
+    push()
+    translate(i, j)
+
+    # Manual control over the size of each circle, key is # living neighbors
+    size_map = {
+        0: 1,
+        1: 2,
+        2: 6,
+        3: 10,
+        4: 14,
+        5: 18,
+        6: 24,
+        7: 28,
+        8: 40,
+    }
+
+    fill(circle_fill)
+    stroke(None)
+
+    for x in range(0, GRID_SIZE):
+        for y in range(0, GRID_SIZE):
+            # Get list of living neighbor cells
+            neighbors = get_neighbors(g, x, y)
+
+            # Get the appropriate circle size
+            circle_size = size_map[len(neighbors)]
+
+            # Center the circle
+            adjust = (CELL_SIZE / 2) - (circle_size / 2)
+            cur_x = (x * CELL_SIZE) + adjust
+            cur_y = (y * CELL_SIZE) + adjust
+
+            # Draw it
+            oval(cur_x, cur_y, circle_size, circle_size)
+
+    pop()
+
+def update_grid(cellgrid):
+    """ Process the grid. """
+    
+    # This is a modified Conway's Game of Life (any cells with two, three,
+    # or five neighbors will be alive next round.
+
+    new_grid = []
+
+    for x in range(0, GRID_SIZE):
+        row = []
+
+        for y in range(0, GRID_SIZE):
+            # Get list of living neighbor cells
+            neighbors = get_neighbors(cellgrid, x, y)
+
+            if len(neighbors) in [2, 3, 5]:
+                new_val = True
+            else:
+                new_val = False
+
+            row.append(new_val)
+
+        new_grid.append(row)
+
+    return new_grid
+
+
+
+### Main
+
+the_grid = setup_grid(3)
+# the_grid = setup_grid()    # Use this if you don't want to set a seed
+
+# Blending mode
+blend("multiply")
+
+# Draw the grid
+# draw_grid(the_grid, MARGIN, MARGIN, true_fill=(0, 0, 90), pen_width=0.5)
+
+# Round 1
+draw_lines(the_grid, MARGIN, MARGIN, pen_stroke="f6ece3", pen_width=0.5)
+draw_circles(the_grid, MARGIN, MARGIN, circle_fill="f6ece3")
+
+# Update grid
+the_grid = update_grid(the_grid)
+
+# Round 2
+draw_lines(the_grid, MARGIN, MARGIN, pen_stroke="eddbcb", pen_width=0.5)
+draw_circles(the_grid, MARGIN, MARGIN, circle_fill="eddbcb")
+
+# Update grid
+the_grid = update_grid(the_grid)
+
+# Round 3
+draw_lines(the_grid, MARGIN, MARGIN, pen_stroke="ad3c25", pen_width=0.5)
+draw_circles(the_grid, MARGIN, MARGIN, circle_fill="ad3c25")
+
+# Draw the outer box
+stroke("ad3c25")
+fill(None)
+rect(MARGIN, MARGIN, BOX_SIZE, BOX_SIZE)
+
+# Save the PDF
+export("output.pdf")
